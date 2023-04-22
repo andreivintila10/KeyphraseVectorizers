@@ -72,6 +72,16 @@ class KeyphraseCountVectorizer(_KeyphraseVectorizerMixin, BaseEstimator):
             A callable function which expects a list of strings in a 'raw_documents' parameter and returns a list of (word token, POS-tag) tuples.
             If this parameter is not None, the custom tagger function is used to tag words with parts-of-speech, while the spaCy pipeline is ignored.
 
+    token_pattern : str or None, default=r"(?u)\\b\\w\\w+\\b"
+        Regular expression denoting what constitutes a "token", only used
+        if ``analyzer == 'word'``. The default regexp select tokens of 2
+        or more alphanumeric characters (punctuation is completely ignored
+        and always treated as a token separator).
+
+        If there is a capturing group in token_pattern then the
+        captured group content, not the entire match, becomes the token.
+        At most one capturing group is permitted.
+
     max_df : int, default=None
         During fitting ignore keyphrases that have a document frequency strictly higher than the given threshold.
 
@@ -90,7 +100,8 @@ class KeyphraseCountVectorizer(_KeyphraseVectorizerMixin, BaseEstimator):
     def __init__(self, spacy_pipeline: Union[str, spacy.Language] = 'en_core_web_sm', pos_pattern: str = '<J.*>*<N.*>+',
                  stop_words: Union[str, List[str]] = 'english', lowercase: bool = True, workers: int = 1,
                  spacy_exclude: List[str] = None, custom_pos_tagger: callable = None,
-                 max_df: int = None, min_df: int = None, binary: bool = False, dtype: np.dtype = np.int64):
+                 token_pattern: Union[str, None] = r'(?u)\b\w\w+\b', max_df: int = None, min_df: int = None,
+                 binary: bool = False, dtype: np.dtype = np.int64):
 
         # triggers a parameter validation
         if not isinstance(min_df, int) and min_df is not None:
@@ -140,6 +151,7 @@ class KeyphraseCountVectorizer(_KeyphraseVectorizerMixin, BaseEstimator):
         self.workers = workers
         self.spacy_exclude = spacy_exclude
         self.custom_pos_tagger = custom_pos_tagger
+        self.token_pattern = token_pattern
         self.max_df = max_df
         self.min_df = min_df
         self.binary = binary
@@ -177,8 +189,8 @@ class KeyphraseCountVectorizer(_KeyphraseVectorizerMixin, BaseEstimator):
             document_keyphrase_counts = CountVectorizer(vocabulary=self.keyphrases, ngram_range=(
                 min([len(keyphrase.split()) for keyphrase in self.keyphrases]),
                 max([len(keyphrase.split()) for keyphrase in self.keyphrases])),
-                                                        lowercase=self.lowercase, binary=self.binary,
-                                                        dtype=self.dtype).transform(
+                                                        lowercase=self.lowercase, token_pattern=self.token_pattern,
+                                                        binary=self.binary, dtype=self.dtype).transform(
                 raw_documents=raw_documents).toarray()
 
             document_frequencies = self._document_frequency(document_keyphrase_counts)
@@ -223,7 +235,8 @@ class KeyphraseCountVectorizer(_KeyphraseVectorizerMixin, BaseEstimator):
 
         # transform
         return CountVectorizer(vocabulary=self.keyphrases, ngram_range=(self.min_n_gram_length, self.max_n_gram_length),
-                               lowercase=self.lowercase, binary=self.binary, dtype=self.dtype).fit_transform(
+                               lowercase=self.lowercase, token_pattern=self.token_pattern,
+                               binary=self.binary, dtype=self.dtype).fit_transform(
             raw_documents=raw_documents)
 
     def transform(self, raw_documents: List[str]) -> List[List[int]]:
@@ -248,7 +261,8 @@ class KeyphraseCountVectorizer(_KeyphraseVectorizerMixin, BaseEstimator):
             raise NotFittedError("Keyphrases not fitted.")
 
         return CountVectorizer(vocabulary=self.keyphrases, ngram_range=(self.min_n_gram_length, self.max_n_gram_length),
-                               lowercase=self.lowercase, binary=self.binary, dtype=self.dtype).transform(
+                               lowercase=self.lowercase, token_pattern=self.token_pattern,
+                               binary=self.binary, dtype=self.dtype).transform(
             raw_documents=raw_documents)
 
     def inverse_transform(self, X: List[List[int]]) -> List[List[str]]:
@@ -271,7 +285,8 @@ class KeyphraseCountVectorizer(_KeyphraseVectorizerMixin, BaseEstimator):
             raise NotFittedError("Keyphrases not fitted.")
 
         return CountVectorizer(vocabulary=self.keyphrases, ngram_range=(self.min_n_gram_length, self.max_n_gram_length),
-                               lowercase=self.lowercase, binary=self.binary, dtype=self.dtype).inverse_transform(X=X)
+                               lowercase=self.lowercase, token_pattern=self.token_pattern,
+                               binary=self.binary, dtype=self.dtype).inverse_transform(X=X)
 
     @deprecated(
         "get_feature_names() is deprecated in scikit-learn 1.0 and will be removed "
@@ -297,8 +312,8 @@ class KeyphraseCountVectorizer(_KeyphraseVectorizerMixin, BaseEstimator):
                 warnings.simplefilter("ignore")
                 return CountVectorizer(vocabulary=self.keyphrases,
                                        ngram_range=(self.min_n_gram_length, self.max_n_gram_length),
-                                       lowercase=self.lowercase, binary=self.binary,
-                                       dtype=self.dtype).get_feature_names()
+                                       lowercase=self.lowercase, token_pattern=self.token_pattern,
+                                       binary=self.binary, dtype=self.dtype).get_feature_names()
         except AttributeError:
             raise DeprecationWarning("get_feature_names() is deprecated. Please use 'get_feature_names_out()' instead.")
 
@@ -317,4 +332,5 @@ class KeyphraseCountVectorizer(_KeyphraseVectorizerMixin, BaseEstimator):
             raise NotFittedError("Keyphrases not fitted.")
 
         return CountVectorizer(vocabulary=self.keyphrases, ngram_range=(self.min_n_gram_length, self.max_n_gram_length),
-                               lowercase=self.lowercase, binary=self.binary, dtype=self.dtype).get_feature_names_out()
+                               lowercase=self.lowercase, token_pattern=self.token_pattern,
+                               binary=self.binary, dtype=self.dtype).get_feature_names_out()
